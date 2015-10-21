@@ -58,12 +58,12 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
                     return 0f;
                 }
 
-                double pressure_Pa = this.Pressure;
+                double pressure = this.Pressure;
 
                 // Calculate using US Standard Atmosphere 1976 (NASA)
-                double altitude_m = 44330.77 * (1 - Math.Pow(pressure_Pa / 101326, 0.1902632));
+                double altitude = 44330.77 * (1 - Math.Pow(pressure / 101326, 0.1902632));
 
-                return Convert.ToSingle(altitude_m);
+                return Convert.ToSingle(altitude);
             }
         }
 
@@ -82,10 +82,10 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
                     return 0f;
                 }
 
-                uint raw_pressure_data = this.RawPressure;
-                double pressure_Pa = (raw_pressure_data >> 6) + (((raw_pressure_data >> 4) & 0x03) / 4.0);
+                uint rawPressureData = this.RawPressure;
+                double pressurePascals = (rawPressureData >> 6) + (((rawPressureData >> 4) & 0x03) / 4.0);
 
-                return Convert.ToSingle(pressure_Pa);
+                return Convert.ToSingle(pressurePascals);
             }
         }
 
@@ -97,8 +97,8 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
             get
             {
                 uint pressure = 0;
-                byte[] reg_data = new byte[1];
-                byte[] raw_pressure_data = new byte[3];
+                byte[] data = new byte[1];
+                byte[] rawPressureData = new byte[3];
 
                 // Request pressure data from the MPL3115A2
                 // MPL3115A2 datasheet: http://dlnmh9ip6v2uc.cloudfront.net/datasheets/Sensors/Pressure/MPL3115A2.pdf
@@ -113,10 +113,10 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
                 // --- off = auto-clear
                 // --- on = initiate measurement
                 // - Write the resulting value back to Control Register 1
-                this.i2c.WriteRead(new byte[] { MPL3115A2.ControlRegister1 }, reg_data);
-                reg_data[0] &= 0xFE;  // ensure SBYB (bit 0) is set to STANDBY
-                reg_data[0] |= 0x02;  // ensure OST (bit 1) is set to initiate measurement
-                this.i2c.Write(new byte[] { MPL3115A2.ControlRegister1, reg_data[0] });
+                this.i2c.WriteRead(new byte[] { MPL3115A2.ControlRegister1 }, data);
+                data[0] &= 0xFE;  // ensure SBYB (bit 0) is set to STANDBY
+                data[0] |= 0x02;  // ensure OST (bit 1) is set to initiate measurement
+                this.i2c.Write(new byte[] { MPL3115A2.ControlRegister1, data[0] });
 
                 // Wait 10ms to allow MPL3115A2 to process the pressure value
                 Task.Delay(10);
@@ -126,12 +126,12 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
                 // - byte 0 - MSB of the pressure
                 // - byte 1 - CSB of the pressure
                 // - byte 2 - LSB of the pressure
-                this.i2c.WriteRead(new byte[] { MPL3115A2.PressureDataOutMSB }, raw_pressure_data);
+                this.i2c.WriteRead(new byte[] { MPL3115A2.PressureDataOutMSB }, rawPressureData);
 
                 // Reconstruct the result using all three bytes returned from the device
-                pressure = (uint)(raw_pressure_data[0] << 16);
-                pressure |= (uint)(raw_pressure_data[1] << 8);
-                pressure |= raw_pressure_data[2];
+                pressure = (uint)(rawPressureData[0] << 16);
+                pressure |= (uint)(rawPressureData[1] << 8);
+                pressure |= rawPressureData[2];
 
                 return pressure;
             }
@@ -187,9 +187,9 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
             // Use the I2cDevice device selector to create an advanced query syntax string
             // Use the Windows.Devices.Enumeration.DeviceInformation class to create a collection using the advanced query syntax string
             // Take the device id of the first device in the collection
-            string advanced_query_syntax = I2cDevice.GetDeviceSelector("I2C1");
-            DeviceInformationCollection device_information_collection = await DeviceInformation.FindAllAsync(advanced_query_syntax);
-            string deviceId = device_information_collection[0].Id;
+            string advancedQuerySyntax = I2cDevice.GetDeviceSelector("I2C1");
+            DeviceInformationCollection deviceInformationCollection = await DeviceInformation.FindAllAsync(advancedQuerySyntax);
+            string deviceId = deviceInformationCollection[0].Id;
 
             // Establish an I2C connection to the MPL3115A2
             //
@@ -198,11 +198,11 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
             // - Set the I2C sharing mode of the connection to shared
             //
             // Instantiate the the MPL3115A2 I2C device using the device id and the I2cConnectionSettings
-            I2cConnectionSettings mpl3115a2_connection = new I2cConnectionSettings(Mpl3115a2I2cAddress);
-            mpl3115a2_connection.BusSpeed = I2cBusSpeed.FastMode;
-            mpl3115a2_connection.SharingMode = I2cSharingMode.Shared;
+            I2cConnectionSettings mpl3115a2Connection = new I2cConnectionSettings(Mpl3115a2I2cAddress);
+            mpl3115a2Connection.BusSpeed = I2cBusSpeed.FastMode;
+            mpl3115a2Connection.SharingMode = I2cSharingMode.Shared;
 
-            this.i2c = await I2cDevice.FromIdAsync(deviceId, mpl3115a2_connection);
+            this.i2c = await I2cDevice.FromIdAsync(deviceId, mpl3115a2Connection);
 
             // Test to see if the I2C devices are available.
             //
@@ -224,18 +224,18 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
             }
             else
             {
-                byte[] reg_data = new byte[1];
+                byte[] data = new byte[1];
 
                 try
                 {
-                    this.i2c.WriteRead(new byte[] { MPL3115A2.ControlRegister1 }, reg_data);
+                    this.i2c.WriteRead(new byte[] { MPL3115A2.ControlRegister1 }, data);
 
                     // ensure SBYB (bit 0) is set to STANDBY
-                    reg_data[0] &= 0xFE;
+                    data[0] &= 0xFE;
 
                     // ensure OST (bit 1) is set to initiate measurement
-                    reg_data[0] |= 0x02;
-                    this.i2c.Write(new byte[] { MPL3115A2.ControlRegister1, reg_data[0] });
+                    data[0] |= 0x02;
+                    this.i2c.Write(new byte[] { MPL3115A2.ControlRegister1, data[0] });
                 }
                 catch
                 {
