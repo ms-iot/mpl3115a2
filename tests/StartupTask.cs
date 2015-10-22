@@ -1,6 +1,6 @@
 ﻿using System;
 using Windows.ApplicationModel.Background;
-using Microsoft.Maker.Devices.I2C.MPL3115A2Device;
+using Microsoft.Maker.Devices.I2C.MPL3115A2;
 
 namespace MPL3115A2Test
 {

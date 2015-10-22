@@ -7,8 +7,8 @@
     <ProjectGuid>{037A02E7-F501-4CAD-BF13-6BB1D9CEBBEC}</ProjectGuid>
     <OutputType>winmdobj</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Microsoft.Maker.Devices.I2C.MPL3115A2Device</RootNamespace>
-    <AssemblyName>Microsoft.Maker.Devices.I2C.MPL3115A2Device</AssemblyName>
+    <RootNamespace>Microsoft.Maker.Devices.I2C.Mpl3115a2</RootNamespace>
+    <AssemblyName>Microsoft.Maker.Devices.I2C.Mpl3115a2</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
     <TargetPlatformVersion>10.0.10240.0</TargetPlatformVersion>
@@ -108,7 +108,7 @@
     <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="MPL3115A2.cs" />
+    <Compile Include="Mpl3115a2.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

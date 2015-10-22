@@ -1,23 +1,22 @@
-﻿//-----------------------------------------------------------------------
-// <copyright file="MPL3115A2.cs" company="Microsoft">
-//     Copyright (c) Microsoft Corporation.  All rights reserved.
-// </copyright>
-//-----------------------------------------------------------------------
-namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
-{
-    using System;
-    using System.Threading.Tasks;
-    using Windows.Devices.Enumeration;
-    using Windows.Devices.Gpio;
-    using Windows.Devices.I2c;
-    using Windows.Foundation;
+﻿using System;
+using System.Threading.Tasks;
+using Windows.Devices.Enumeration;
+using Windows.Devices.I2c;
+using Windows.Foundation;
 
+namespace Microsoft.Maker.Devices.I2C.Mpl3115a2
+{
     /// <summary>
     /// MPL3115A2 precision altimeter IC
     /// http://cache.freescale.com/files/sensors/doc/data_sheet/MPL3115A2.pdf
     /// </summary>
-    public sealed class MPL3115A2
+    public sealed class Mpl3115a2
     {
+        /// <summary>
+        /// Device I2C Bus
+        /// </summary>
+        private string i2cBusName;
+
         /// <summary>
         /// Device I2C Address
         /// </summary>
@@ -36,12 +35,23 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
         /// <summary>
         /// Control Flags
         /// </summary>
-        private bool enable = false;
+        private bool available = false;
 
         /// <summary>
         /// I2C Device
         /// </summary>
         private I2cDevice i2c;
+
+        /// <summary>
+        /// Constructs Mpl3115a2 with I2C bus identified
+        /// </summary>
+        /// <param name="i2cBusName">
+        /// The bus name to provide to the enumerator
+        /// </param>
+        public Mpl3115a2 (string i2cBusName)
+        {
+            this.i2cBusName = i2cBusName;
+        }
 
         /// <summary>
         /// Gets the altitude data
@@ -53,7 +63,7 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
         {
             get
             {
-                if (!this.enable)
+                if (!this.available)
                 {
                     return 0f;
                 }
@@ -68,6 +78,17 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
         }
 
         /// <summary>
+        /// Initialize the Mpl3115a2 device.
+        /// </summary>
+        /// <returns>
+        /// Async operation object.
+        /// </returns>
+        public IAsyncOperation<bool> BeginAsync()
+        {
+            return this.BeginAsyncHelper().AsAsyncOperation<bool>();
+        }
+
+        /// <summary>
         /// Gets pressure data
         /// </summary>
         /// <returns>
@@ -77,7 +98,7 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
         {
             get
             {
-                if (!this.enable)
+                if (!this.available)
                 {
                     return 0f;
                 }
@@ -87,65 +108,6 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
 
                 return Convert.ToSingle(pressurePascals);
             }
-        }
-
-        /// <summary>
-        /// Gets the raw pressure value from the IC.
-        /// </summary>
-        private uint RawPressure
-        {
-            get
-            {
-                uint pressure = 0;
-                byte[] data = new byte[1];
-                byte[] rawPressureData = new byte[3];
-
-                // Request pressure data from the MPL3115A2
-                // MPL3115A2 datasheet: http://dlnmh9ip6v2uc.cloudfront.net/datasheets/Sensors/Pressure/MPL3115A2.pdf
-                //
-                // Update Control Register 1 Flags
-                // - Read data at CTRL_REG1 (0x26) on the MPL3115A2
-                // - Update the SBYB (bit 0) and OST (bit 1) flags to STANDBY and initiate measurement, respectively.
-                // -- SBYB flag (bit 0)
-                // --- off = Part is in STANDBY mode
-                // --- on = Part is ACTIVE
-                // -- OST flag (bit 1)
-                // --- off = auto-clear
-                // --- on = initiate measurement
-                // - Write the resulting value back to Control Register 1
-                this.i2c.WriteRead(new byte[] { MPL3115A2.ControlRegister1 }, data);
-                data[0] &= 0xFE;  // ensure SBYB (bit 0) is set to STANDBY
-                data[0] |= 0x02;  // ensure OST (bit 1) is set to initiate measurement
-                this.i2c.Write(new byte[] { MPL3115A2.ControlRegister1, data[0] });
-
-                // Wait 10ms to allow MPL3115A2 to process the pressure value
-                Task.Delay(10);
-
-                // Write the address of the register of the most significant byte for the pressure value, OUT_P_MSB (0x01)
-                // Read the three bytes returned by the MPL3115A2
-                // - byte 0 - MSB of the pressure
-                // - byte 1 - CSB of the pressure
-                // - byte 2 - LSB of the pressure
-                this.i2c.WriteRead(new byte[] { MPL3115A2.PressureDataOutMSB }, rawPressureData);
-
-                // Reconstruct the result using all three bytes returned from the device
-                pressure = (uint)(rawPressureData[0] << 16);
-                pressure |= (uint)(rawPressureData[1] << 8);
-                pressure |= rawPressureData[2];
-
-                return pressure;
-            }
-        }
-
-        /// <summary>
-        /// Initialize the altimeter device.
-        /// </summary>
-        /// <returns>
-        /// Async operation object.
-        /// </returns>
-        public IAsyncOperation<bool> BeginAsync()
-        {
-            return this.BeginAsyncHelper().AsAsyncOperation<bool>();
         }
 
         /// <summary>
@@ -159,35 +121,13 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
         /// </returns>
         private async Task<bool> BeginAsyncHelper()
         {
-            // Acquire the GPIO controller
-            // MSDN GPIO Reference: https://msdn.microsoft.com/en-us/library/windows/apps/windows.devices.gpio.aspx
-            //
-            // Get the default GpioController
-            GpioController gpio = GpioController.GetDefault();
-
-            // Test to see if the GPIO controller is available.
-            //
-            // If the GPIO controller is not available, this is
-            // a good indicator the app has been deployed to a
-            // computing environment that is not capable of
-            // controlling the weather shield. Therefore we
-            // will disable the weather shield functionality to
-            // handle the failure case gracefully. This allows
-            // the invoking application to remain deployable
-            // across the Universal Windows Platform.
-            if (null == gpio)
-            {
-                this.enable = false;
-                return this.enable;
-            }
-
             // Acquire the I2C device
             // MSDN I2C Reference: https://msdn.microsoft.com/en-us/library/windows/apps/windows.devices.i2c.aspx
             //
             // Use the I2cDevice device selector to create an advanced query syntax string
             // Use the Windows.Devices.Enumeration.DeviceInformation class to create a collection using the advanced query syntax string
             // Take the device id of the first device in the collection
-            string advancedQuerySyntax = I2cDevice.GetDeviceSelector("I2C1");
+            string advancedQuerySyntax = I2cDevice.GetDeviceSelector(i2cBusName);
             DeviceInformationCollection deviceInformationCollection = await DeviceInformation.FindAllAsync(advancedQuerySyntax);
             string deviceId = deviceInformationCollection[0].Id;
 
@@ -219,8 +159,8 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
             // refer to the "Raw___" functions provided below.
             if (null == this.i2c)
             {
-                this.enable = false;
-                return this.enable;
+                this.available = false;
+                return this.available;
             }
             else
             {
@@ -228,25 +168,72 @@ namespace Microsoft.Maker.Devices.I2C.MPL3115A2Device
 
                 try
                 {
-                    this.i2c.WriteRead(new byte[] { MPL3115A2.ControlRegister1 }, data);
+                    this.i2c.WriteRead(new byte[] { Mpl3115a2.ControlRegister1 }, data);
 
                     // ensure SBYB (bit 0) is set to STANDBY
                     data[0] &= 0xFE;
 
                     // ensure OST (bit 1) is set to initiate measurement
                     data[0] |= 0x02;
-                    this.i2c.Write(new byte[] { MPL3115A2.ControlRegister1, data[0] });
+                    this.i2c.Write(new byte[] { Mpl3115a2.ControlRegister1, data[0] });
+
+                    this.available = true;
                 }
                 catch
                 {
-                    this.enable = false;
-                    return this.enable;
+                    this.available = false;
                 }
             }
 
-            this.enable = true;
+            return this.available;
+        }
 
-            return this.enable;
+        /// <summary>
+        /// Gets the raw pressure value from the IC.
+        /// </summary>
+        private uint RawPressure
+        {
+            get
+            {
+                uint pressure = 0;
+                byte[] data = new byte[1];
+                byte[] rawPressureData = new byte[3];
+
+                // Request pressure data from the MPL3115A2
+                // MPL3115A2 datasheet: http://dlnmh9ip6v2uc.cloudfront.net/datasheets/Sensors/Pressure/MPL3115A2.pdf
+                //
+                // Update Control Register 1 Flags
+                // - Read data at CTRL_REG1 (0x26) on the MPL3115A2
+                // - Update the SBYB (bit 0) and OST (bit 1) flags to STANDBY and initiate measurement, respectively.
+                // -- SBYB flag (bit 0)
+                // --- off = Part is in STANDBY mode
+                // --- on = Part is ACTIVE
+                // -- OST flag (bit 1)
+                // --- off = auto-clear
+                // --- on = initiate measurement
+                // - Write the resulting value back to Control Register 1
+                this.i2c.WriteRead(new byte[] { Mpl3115a2.ControlRegister1 }, data);
+                data[0] &= 0xFE;  // ensure SBYB (bit 0) is set to STANDBY
+                data[0] |= 0x02;  // ensure OST (bit 1) is set to initiate measurement
+                this.i2c.Write(new byte[] { Mpl3115a2.ControlRegister1, data[0] });
+
+                // Wait 10ms to allow MPL3115A2 to process the pressure value
+                Task.Delay(10);
+
+                // Write the address of the register of the most significant byte for the pressure value, OUT_P_MSB (0x01)
+                // Read the three bytes returned by the MPL3115A2
+                // - byte 0 - MSB of the pressure
+                // - byte 1 - CSB of the pressure
+                // - byte 2 - LSB of the pressure
+                this.i2c.WriteRead(new byte[] { Mpl3115a2.PressureDataOutMSB }, rawPressureData);
+
+                // Reconstruct the result using all three bytes returned from the device
+                pressure = (uint)(rawPressureData[0] << 16);
+                pressure |= (uint)(rawPressureData[1] << 8);
+                pressure |= rawPressureData[2];
+
+                return pressure;
+            }
         }
     }
 }
