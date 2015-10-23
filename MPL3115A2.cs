@@ -138,11 +138,7 @@ namespace Microsoft.Maker.Devices.I2C.Mpl3115a2
             // - Set the I2C sharing mode of the connection to shared
             //
             // Instantiate the the MPL3115A2 I2C device using the device id and the I2cConnectionSettings
-            I2cConnectionSettings mpl3115a2Connection = new I2cConnectionSettings(Mpl3115a2I2cAddress);
-            mpl3115a2Connection.BusSpeed = I2cBusSpeed.FastMode;
-            mpl3115a2Connection.SharingMode = I2cSharingMode.Shared;
-
-            this.i2c = await I2cDevice.FromIdAsync(deviceId, mpl3115a2Connection);
+            //TODO: Add your code here. [HINT: see htdu21d]
 
             // Test to see if the I2C devices are available.
             //
@@ -168,16 +164,7 @@ namespace Microsoft.Maker.Devices.I2C.Mpl3115a2
 
                 try
                 {
-                    this.i2c.WriteRead(new byte[] { Mpl3115a2.ControlRegister1 }, data);
-
-                    // ensure SBYB (bit 0) is set to STANDBY
-                    data[0] &= 0xFE;
-
-                    // ensure OST (bit 1) is set to initiate measurement
-                    data[0] |= 0x02;
-                    this.i2c.Write(new byte[] { Mpl3115a2.ControlRegister1, data[0] });
-
-                    this.available = true;
+                    //TODO: Add your code here. [HINT: see RawPressure()]
                 }
                 catch
                 {
